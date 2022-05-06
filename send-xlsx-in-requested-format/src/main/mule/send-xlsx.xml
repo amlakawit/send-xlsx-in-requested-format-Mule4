@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="84e76e11-8b5b-4ef6-bb1c-7ea1471b2543" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<flow name="send-xlsxFlow" doc:id="c7cc67a8-b1d0-45f5-a97a-760afcb93b88" >
+		<http:listener doc:name="Listener" doc:id="00d38b29-6192-450a-a7a5-4831a51d19c7" config-ref="HTTP_Listener_config" path="send-xlsx"/>
+		<set-variable value="#[attributes.queryParams.format]" doc:name="Save Data Format form Query Paramerrs " doc:id="e4e2e535-19f0-46c9-90e7-67bfe408a390" variableName="queryParamDataFormat"/>
+		<set-variable value="#[attributes.headers.'content-type']" doc:name="Save Header Contenet Type" doc:id="85668dda-04b0-40c8-b165-df05c05fbb31" variableName="headerDataFormat"/>
+		<ee:transform doc:name="Transform Message" doc:id="39b14cb9-1bc0-4a88-aa46-4b839a0b7b69" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="requested_data_format" ><![CDATA[%dw 2.0
+output application/java
+---
+
+	if(isEmpty(vars.queryParamDataFormat)==true)
+	 	splitBy(vars.headerDataFormat, '/')[1]
+	 
+	else
+		vars.queryParamDataFormat]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<file:read doc:name="Read xlsx data" doc:id="2b6fe08c-d63f-4a32-8d91-01eb1041553c" path="C:\workspace\MuleSoft\MuleSoftWithFish\Hands-On\data-input-only\airports.xlsx" outputMimeType="application/xlsx"/>
+		<choice doc:name="Choice" doc:id="1edabd91-f834-4d75-ba17-38eb98638119" >
+			<when expression="#[vars.requested_data_format == 'csv']">
+				<ee:transform doc:name="to CSV" doc:id="f68b4bab-1598-4cc3-ad79-57beb32039ea" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/csv
+---
+
+	payload.airports 
+]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<when expression="#[vars.requested_data_format=='xml']">
+				<ee:transform doc:name="to XML" doc:id="8a3b4da9-45c9-4bda-b035-52e4ad062c86" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml
+---
+{
+	'airports':
+	{
+		"data": payload.airports
+	}
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<when expression="#[vars.requested_data_format == 'json']">
+				<ee:transform doc:name="to JSON" doc:id="c90b4a11-1c91-4c96-ba5f-9335f622510e" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.airports]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<when expression="#[isEmpty(vars.requested_data_format)]">
+				<ee:transform doc:name="to JSON" doc:id="57e570c2-da02-47c1-ab1b-5e701a6ccc8c" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.airports]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="Transform Message" doc:id="616ef412-bf37-4233-bfd6-a1d11b9308f3" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": vars.requested_data_format default " "++" is not supported data format"
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</flow>
+</mule>
